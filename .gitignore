@@ -1,0 +1,5 @@
+# Built CLI binary (assets/*.exe and *.dll ARE tracked — they are embedded)
+/wav2wem.exe
+/cmd/wav2wem/wav2wem.exe
+*.test
+*.out
