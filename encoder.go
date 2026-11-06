@@ -3,8 +3,6 @@
 package wav2wem
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -30,40 +28,30 @@ var (
 	encErr  error
 )
 
-// encoderPath extracts the embedded oggenc2.exe + libFLAC.dll to a per-version
-// temp dir (so the DLL sits beside the exe) and returns the exe path.
+// encoderPath now cleanly locates the asset on disk right beside the running binary.
+// No writing to the Windows Temp directory, no runtime binary dropping!
 func encoderPath() (string, error) {
 	encOnce.Do(func() {
-		sum := sha256.Sum256(oggencExe)
-		dir := filepath.Join(os.TempDir(), "wav2wem-enc-"+hex.EncodeToString(sum[:6]))
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			encErr = err
+		// Look up the path of the currently executing wav2wem.exe
+		execPath, err := os.Executable()
+		if err != nil {
+			encErr = fmt.Errorf("failed to look up executable path: %w", err)
 			return
 		}
-		exe := filepath.Join(dir, "oggenc2.exe")
-		dll := filepath.Join(dir, "libFLAC.dll")
-		if err := writeIfMissing(exe, oggencExe); err != nil {
-			encErr = err
+		execDir := filepath.Dir(execPath)
+
+		// Point directly to the assets directory shipped with your mod pack
+		exeTarget := filepath.Join(execDir, "assets", "oggenc2.exe")
+
+		// Verify the binary actually exists where it's supposed to be
+		if _, err := os.Stat(exeTarget); os.IsNotExist(err) {
+			encErr = fmt.Errorf("standalone encoder binary missing at target path: %s", exeTarget)
 			return
 		}
-		if err := writeIfMissing(dll, libflacDLL); err != nil {
-			encErr = err
-			return
-		}
-		encPath = exe
+
+		encPath = exeTarget
 	})
 	return encPath, encErr
-}
-
-func writeIfMissing(path string, data []byte) error {
-	if fi, err := os.Stat(path); err == nil && fi.Size() == int64(len(data)) {
-		return nil
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o755); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
 }
 
 // encodeToOgg encodes a .wav/.flac source to Ogg Vorbis bytes via oggenc2.
@@ -72,7 +60,12 @@ func encodeToOgg(src string, enc EncodeOptions) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("prepare encoder: %w", err)
 	}
-	tmp, err := os.CreateTemp("", "wav2wem-*.ogg")
+
+	// Staging target: Keep the temporary .ogg buffer contained inside the project workspace directory
+	execPath, _ := os.Executable()
+	workspaceDir := filepath.Dir(execPath)
+
+	tmp, err := os.CreateTemp(workspaceDir, "w2w-stream-*.ogg")
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +84,7 @@ func encodeToOgg(src string, enc EncodeOptions) ([]byte, error) {
 	if enc.Downmix {
 		args = append(args, "--downmix")
 	}
+
 	cmd := exec.Command(exe, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

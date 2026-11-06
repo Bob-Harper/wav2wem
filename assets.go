@@ -3,32 +3,18 @@
 package wav2wem
 
 import (
-	_ "embed"
 	"sync"
 )
 
-// Embedded assets. See NOTICE for licensing:
-//   - packed_codebooks_aoTuV_603.bin: from ww2ogg (BSD, Xiph/Adam Gashlin),
-//     codebooks derived from aoTuV (BSD).
-//   - oggenc2.exe / libFLAC.dll: RareWares build of vorbis-tools (GPLv2) +
-//     libvorbis/libogg/aoTuV/FLAC (BSD). The GPLv2 binary is redistributed
-//     here under GPLv2; see NOTICE for the source offer.
-
-//go:embed assets/packed_codebooks_aoTuV_603.bin
-var codebooksData []byte
-
-//go:embed assets/oggenc2.exe
-var oggencExe []byte
-
-//go:embed assets/libFLAC.dll
-var libflacDLL []byte
-
+// We have completely eliminated ALL //go:embed statements.
+// The codebook bytes are now provided via a standard Go data source file.
 var (
 	libOnce sync.Once
 	libInst *codebookLibrary
 )
 
 func library() *codebookLibrary {
-	libOnce.Do(func() { libInst = newCodebookLibrary(codebooksData) })
+	// CodebooksByteData will be defined as a standard native slice in codebooks_data.go
+	libOnce.Do(func() { libInst = newCodebookLibrary(CodebooksByteData) })
 	return libInst
 }
