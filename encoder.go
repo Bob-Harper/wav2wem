@@ -41,7 +41,7 @@ func encoderPath() (string, error) {
 		execDir := filepath.Dir(execPath)
 
 		// Point directly to the assets directory shipped with your mod pack
-		exeTarget := filepath.Join(execDir, "assets", "oggenc2.exe")
+		exeTarget := filepath.Join(execDir, "oggenc2.exe")
 
 		// Verify the binary actually exists where it's supposed to be
 		if _, err := os.Stat(exeTarget); os.IsNotExist(err) {
